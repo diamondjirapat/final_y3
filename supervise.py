@@ -1,79 +1,111 @@
 import pandas as pd
+import numpy as np
+import seaborn as sns
 import matplotlib.pyplot as plt
-
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.experimental import enable_iterative_imputer
-from sklearn.impute import IterativeImputer
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 
 df = pd.read_csv('cleansing_water_data.csv')
 
-factor_cols = [col for col in df.columns if col.startswith('factor_')]
+df_clean = df[df['use_cleansing_water'] == 'ใช้'].copy()
+# df_clean.to_csv('clean_cleansing_water_data.csv', index=False)
 
-imputer_rf = IterativeImputer(
-    estimator=RandomForestRegressor(n_estimators=50, random_state=42),
-    max_iter=10,
-    random_state=42
+df_clean['uses_kiyora'] = df_clean['brands_used'].apply(
+    lambda x: 1 if isinstance(x, str) and 'Kiyora' in x else 0
 )
 
-imputed_data = imputer_rf.fit_transform(df[factor_cols])
+factor_cols = [c for c in df.columns if c.startswith('factor_')]
+# for col in factor_cols:
+#     df_clean[col] = df_clean[col].fillna(df_clean[col].median())
 
-df[factor_cols] = pd.DataFrame(imputed_data, columns=factor_cols, index=df.index)
+def get_dummies_multiselect(series, prefix):
+    return series.str.get_dummies(sep=',').add_prefix(f"{prefix}_")
 
-df.to_csv('cleansing_water_data_supervise_fill.csv')
+concerns_df = get_dummies_multiselect(df_clean['concerns'], 'concern')
 
-for col in factor_cols:
-    df[col] = pd.to_numeric(df[col], errors='coerce')
+# concerns_df.to_csv('concerns_multiselect.csv', index=False)
+# df_clean.to_csv('clean_cleansing_water_data.csv', index=False)
 
-df[factor_cols] = df[factor_cols].fillna(df[factor_cols].mean())
-df['is_kiyora'] = (df['brand_primary'] == 'Kiyora').astype(int)
-
-X = df[factor_cols]
-y = df['is_kiyora']
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+skin_type_encoded = pd.get_dummies(df_clean['skin_type'], prefix='skin', drop_first=False)
+le = LabelEncoder()
+df_clean['age_encoded'] = le.fit_transform(df_clean['age'])
+df_clean['income_encoded'] = le.fit_transform(df_clean['monthly_income'])
 
 
-rf_model = RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced')
-rf_model.fit(X_train, y_train)
+X = pd.concat([df_clean[factor_cols], concerns_df, skin_type_encoded, df_clean[['age_encoded', 'income_encoded']]], axis=1)
+y = df_clean['uses_kiyora']
+# X.to_csv('x.csv', index=False)
 
-feature_importances = pd.DataFrame(
-    {
-        'Factor': factor_cols,
-        'Importance_Score': rf_model.feature_importances_
+class corr:
+    corr = X.corrwith(y).sort_values(ascending=False)
+    print("--- ปัจจัยที่มีผลเชิงบวกต่อการเลือกใช้ Kiyora มากที่สุด ---")
+    print(corr.head(5))
+
+    plt.rcParams['font.family'] = 'Tahoma'
+    plt.figure(figsize=(10, 8))
+    top_features = corr.abs().sort_values(ascending=False).head(10).index
+    sns.heatmap(X[top_features].join(y).corr(), annot=True, cmap='coolwarm', fmt=".2f")
+    plt.title('Correlation Heatmap (Top 10 Features vs Uses Kiyora)')
+    plt.tight_layout()
+    plt.show()
+
+class train:
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
+
+    models = {
+        'Logistic Regression': LogisticRegression(max_iter=1000, random_state=42),
+        'Decision Tree': DecisionTreeClassifier(max_depth=3, random_state=42),
+        'Random Forest': RandomForestClassifier(n_estimators=50, max_depth=3, random_state=42)
     }
-).sort_values(by='Importance_Score', ascending=False)
 
-print("Why Kiyora (Top 5):")
-print(feature_importances.head(5).to_string(index=False))
-print("\n")
+    results = []
+    for name, model in models.items():
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
 
-y_pred = rf_model.predict(X_test)
+        results.append({
+            'Model': name,
+            'Accuracy': accuracy_score(y_test, y_pred),
+            'Precision': precision_score(y_test, y_pred),
+            'Recall': recall_score(y_test, y_pred),
+            'F1-score': f1_score(y_test, y_pred)
+        })
 
-accuracy = accuracy_score(y_test, y_pred)
-precision = precision_score(y_test, y_pred)
-recall = recall_score(y_test, y_pred)
-f1 = f1_score(y_test, y_pred)
+    results_df = pd.DataFrame(results)
+    print("\n--- Model Accuracy ---")
+    print(results_df)
 
-metrics = {
-    'Accuracy': accuracy,
-    'Precision': precision,
-    'Recall': recall,
-    'F1 Score': f1
-}
+    model = DecisionTreeClassifier(max_depth=3, random_state=42).fit(X_train, y_train)
+    import joblib
+    joblib.dump(model, 'dt.pkl')
 
-print(metrics)
-names = list(metrics.keys())
-values = list(metrics.values())
+    #plot
+    results_df.set_index('Model', inplace=True)
+    results_df.plot(kind='bar', figsize=(10, 6))
+    plt.title('Model Performance Comparison')
+    plt.ylabel('Score')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
 
-plt.bar(names, values)
-plt.ylim(0, 1)
-plt.title('Model Performance Metrics')
-plt.ylabel('Score')
-plt.xlabel('Metric')
+class plot:
+    plt.figure(figsize=(12, 5))
+    plt.subplot(1, 2, 1)
+    sns.countplot(y='age', data=df_clean, order=df_clean['age'].value_counts().index)
+    plt.title('อายุคนที่ใช้ Cleansing Water)')
 
-for i, v in enumerate(values):
-    plt.text(i, v + 0.02, f"{v:.2f}", ha='center')
+    plt.subplot(1, 2, 2)
+    sns.countplot(y='skin_type', data=df_clean, order=df_clean['skin_type'].value_counts().index)
+    plt.title('สภาพผิวของคนใช้ Cleansing Water')
+    plt.tight_layout()
 
-plt.show()
+    plt.figure(figsize=(12, 6))
+    df_factors = df_clean[factor_cols].rename(columns=lambda x: x.replace('factor_', ''))
+    sns.boxplot(data=df_factors, orient='h')
+    plt.title('คะแนนปัจจัยในการเลือกซื้อ')
+    plt.tight_layout()
+    plt.show()
