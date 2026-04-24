@@ -34,8 +34,10 @@ rename_map = {
 }
 data.rename(columns=rename_map, inplace=True)
 
-# data.to_csv("cleansing_water_data.csv", index=False)
+
 
 data = data.drop(['Timestamp'], axis=1)
 
 print(data.columns)
+
+data.to_csv("cleansing_water_data.csv", index=False)

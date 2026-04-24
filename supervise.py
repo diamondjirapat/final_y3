@@ -40,20 +40,23 @@ X = pd.concat([df_clean[factor_cols], concerns_df, skin_type_encoded, df_clean[[
 y = df_clean['uses_kiyora']
 # X.to_csv('x.csv', index=False)
 
-class corr:
-    corr = X.corrwith(y).sort_values(ascending=False)
-    print("--- ปัจจัยที่มีผลเชิงบวกต่อการเลือกใช้ Kiyora มากที่สุด ---")
-    print(corr.head(5))
+corr = X.corrwith(y).sort_values(ascending=False)
+print("--- ปัจจัยที่มีผลเชิงบวกต่อการเลือกใช้ Kiyora มากที่สุด ---")
+print(corr.head(5))
 
-    plt.rcParams['font.family'] = 'Tahoma'
-    plt.figure(figsize=(10, 8))
-    top_features = corr.abs().sort_values(ascending=False).head(10).index
-    sns.heatmap(X[top_features].join(y).corr(), annot=True, cmap='coolwarm', fmt=".2f")
-    plt.title('Correlation Heatmap (Top 10 Features vs Uses Kiyora)')
-    plt.tight_layout()
-    plt.show()
+plt.rcParams['font.family'] = 'Tahoma'
+plt.figure(figsize=(30, 30))
+top_features = corr.sort_values().index
+sns.heatmap(X[top_features].join(y).corr(), annot=True, cmap='coolwarm', fmt=".2f")
+plt.title('Correlation Heatmap (Top 10 Features vs Uses Kiyora)')
+plt.tight_layout()
+plt.show()
 
 class train:
+    corr_values = X.corrwith(y)
+    selected_features = corr_values[corr_values >= 0.10].index.tolist()
+    X = X[selected_features]
+    y = df_clean['uses_kiyora']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
 
     models = {
