@@ -96,19 +96,41 @@ class train:
     plt.show()
 
 class plot:
+    df_kiyora_users = df_clean[df_clean['uses_kiyora'] == 1].copy()
     plt.figure(figsize=(12, 5))
     plt.subplot(1, 2, 1)
-    sns.countplot(y='age', data=df_clean, order=df_clean['age'].value_counts().index)
-    plt.title('อายุคนที่ใช้ Cleansing Water)')
+    sns.countplot(y='age', data=df_kiyora_users, order=df_kiyora_users['age'].value_counts().index)
+    plt.title('อายุคนที่ใช้แบรนด์ Kiyora')
 
     plt.subplot(1, 2, 2)
-    sns.countplot(y='skin_type', data=df_clean, order=df_clean['skin_type'].value_counts().index)
-    plt.title('สภาพผิวของคนใช้ Cleansing Water')
+    sns.countplot(y='skin_type', data=df_kiyora_users, order=df_kiyora_users['skin_type'].value_counts().index)
+    plt.title('สภาพผิวของคนที่ใช้แบรนด์ Kiyora')
     plt.tight_layout()
+    plt.show()
 
     plt.figure(figsize=(12, 6))
-    df_factors = df_clean[factor_cols].rename(columns=lambda x: x.replace('factor_', ''))
-    sns.boxplot(data=df_factors, orient='h')
-    plt.title('คะแนนปัจจัยในการเลือกซื้อ')
+    df_factors_kiyora = df_kiyora_users[factor_cols].rename(columns=lambda x: x.replace('factor_', ''))
+
+    sns.boxplot(data=df_factors_kiyora, orient='h')
+    plt.title('คะแนนปัจจัยในการเลือกซื้อ Kiyora')
+    plt.xlabel('คะแนน (1-5)')
+    plt.tight_layout()
+    plt.show()
+
+class plotComparison:
+    top_brands = df_clean['brand_primary'].value_counts().head(5).index.tolist()
+    df_top_brands = df_clean[df_clean['brand_primary'].isin(top_brands)]
+
+    brand_core_values = df_top_brands.groupby('brand_primary')[factor_cols].mean()
+    brand_core_values.columns = [c.replace('factor_', '') for c in brand_core_values.columns]
+
+    print("Core Values Top 5 Brand")
+    print(brand_core_values.T.round(2))
+
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(brand_core_values.T, annot=True, cmap='coolwarm', fmt=".2f", linewidths=.5)
+    plt.title('Brand Core Values Comparison')
+    plt.xlabel('Brands')
+    plt.ylabel('Factors')
     plt.tight_layout()
     plt.show()
