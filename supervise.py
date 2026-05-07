@@ -96,23 +96,26 @@ class train:
     plt.show()
 
 class plot:
-    df_kiyora_users = df_clean[df_clean['uses_kiyora'] == 1].copy()
-    plt.figure(figsize=(12, 5))
+    top_brands = df_clean['brand_primary'].value_counts().head(5).index.tolist()
+    df_top_brands = df_clean[df_clean['brand_primary'].isin(top_brands)].copy()
+
+    plt.figure(figsize=(14, 6))
     plt.subplot(1, 2, 1)
-    sns.countplot(y='age', data=df_kiyora_users, order=df_kiyora_users['age'].value_counts().index)
-    plt.title('อายุคนที่ใช้แบรนด์ Kiyora')
+    sns.countplot(y='age', hue='brand_primary', data=df_top_brands, order=df_top_brands['age'].value_counts().index)
+    plt.title('อายุคนที่ใช้แต่ละแบรนด์เป็นหลัก')
 
     plt.subplot(1, 2, 2)
-    sns.countplot(y='skin_type', data=df_kiyora_users, order=df_kiyora_users['skin_type'].value_counts().index)
-    plt.title('สภาพผิวของคนที่ใช้แบรนด์ Kiyora')
+    sns.countplot(y='skin_type', hue='brand_primary', data=df_top_brands, order=df_top_brands['skin_type'].value_counts().index)
+    plt.title('สภาพผิวของคนที่ใช้แต่ละแบรนด์เป็นหลัก')
     plt.tight_layout()
     plt.show()
 
-    plt.figure(figsize=(12, 6))
-    df_factors_kiyora = df_kiyora_users[factor_cols].rename(columns=lambda x: x.replace('factor_', ''))
+    plt.figure(figsize=(14, 8))
+    df_factors = df_top_brands[['brand_primary'] + factor_cols].rename(columns=lambda x: x.replace('factor_', ''))
+    df_melted = df_factors.melt(id_vars='brand_primary', var_name='Factor', value_name='Score')
 
-    sns.boxplot(data=df_factors_kiyora, orient='h')
-    plt.title('คะแนนปัจจัยในการเลือกซื้อ Kiyora')
+    sns.boxplot(x='Score', y='Factor', hue='brand_primary', data=df_melted, orient='h')
+    plt.title('คะแนนปัจจัยในการเลือกซื้อแต่ละแบรนด์เป็นหลัก')
     plt.xlabel('คะแนน (1-5)')
     plt.tight_layout()
     plt.show()
